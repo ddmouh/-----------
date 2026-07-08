@@ -388,6 +388,7 @@ function GameApp() {
     gameState,
     chatMessages,
     error,
+    playerId,
     createRoom,
     joinRoom,
     addMockPlayers,
@@ -467,7 +468,7 @@ function GameApp() {
   if (!mounted) return null;
 
   /* ── Derived ── */
-  const myId   = socket?.id;
+  const myId   = playerId || socket?.id;
   const me     = gameState?.players?.[myId];
   const isHost = me?.isHost;
 
@@ -1022,7 +1023,7 @@ function GameApp() {
               <button
                 className="btn-primary"
                 style={{ width: 'auto', padding: '14px 28px', background: 'linear-gradient(135deg, #9c27b0, #6a1b9a)' }}
-                onClick={() => resetToLobby && resetToLobby()} // fallback or server transition trigger
+                onClick={() => startForensicPhase && startForensicPhase()} // fallback or server transition trigger
               >
                 {txt('startInvestigationBtn')}
               </button>

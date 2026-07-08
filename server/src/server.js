@@ -94,8 +94,11 @@ function broadcastRoomState(roomId) {
 
   const playerIds = Object.keys(room.players);
   playerIds.forEach(pId => {
-    const sanitized = sanitizeStateForPlayer(room, pId);
-    io.to(pId).emit('room_state_update', sanitized);
+    const player = room.players[pId];
+    if (player && player.socketId) {
+      const sanitized = sanitizeStateForPlayer(room, pId);
+      io.to(player.socketId).emit('room_state_update', sanitized);
+    }
   });
 }
 
@@ -103,14 +106,16 @@ io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
 
   // Join Room
-  socket.on('join_room', ({ roomId, playerName }) => {
+  socket.on('join_room', ({ roomId, playerName, playerId }) => {
     const id = roomId.toUpperCase();
     let room = roomManager.getRoom(id);
 
+    const effectivePlayerId = playerId || socket.id;
+
     if (!room) {
-      room = roomManager.createRoom(id, socket.id, playerName);
+      room = roomManager.createRoom(id, effectivePlayerId, playerName, socket.id);
     } else {
-      const result = roomManager.joinRoom(id, socket.id, playerName);
+      const result = roomManager.joinRoom(id, effectivePlayerId, playerName, socket.id);
       if (result && result.error) {
         socket.emit('error_message', result.error);
         return;
@@ -239,14 +244,14 @@ io.on('connection', (socket) => {
     const room = roomManager.getRoom(roomId);
     if (!room) return;
 
-    const player = room.players[socket.id];
+    const player = Object.values(room.players).find(p => p.socketId === socket.id);
     // Forensic Scientist and dead players (spectators) cannot chat
     if (!player || !player.isAlive || player.role === 'forensic') {
       return;
     }
 
     const chatData = {
-      senderId: socket.id,
+      senderId: player.id,
       senderName: player.name,
       message,
       timestamp: new Date().toLocaleTimeString('ar-EG', { hour12: false })
@@ -259,7 +264,7 @@ io.on('connection', (socket) => {
   socket.on('leave_room', ({ roomId }) => {
     if (roomId) {
       socket.leave(roomId);
-      const room = roomManager.leaveRoom(roomId, socket.id);
+      const room = roomManager.forceLeaveRoom(roomId, socket.id);
       if (room) {
         broadcastRoomState(roomId);
       }

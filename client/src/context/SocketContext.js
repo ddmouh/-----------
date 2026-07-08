@@ -12,8 +12,16 @@ export const SocketProvider = ({ children }) => {
   const [gameState, setGameState] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [error, setError] = useState(null);
+  const [playerId, setPlayerId] = useState(null);
 
   useEffect(() => {
+    let pid = sessionStorage.getItem('deception_player_id');
+    if (!pid) {
+      pid = 'p_' + Math.random().toString(36).substring(2, 15);
+      sessionStorage.setItem('deception_player_id', pid);
+    }
+    setPlayerId(pid);
+
     const newSocket = io(SOCKET_URL, {
       autoConnect: true
     });
@@ -22,6 +30,14 @@ export const SocketProvider = ({ children }) => {
 
     newSocket.on('connect', () => {
       console.log('Connected to game server:', newSocket.id);
+      
+      // Auto-rejoin if saved room and name exist
+      const savedRoomId = sessionStorage.getItem('deception_room_id');
+      const savedPlayerName = sessionStorage.getItem('deception_player_name');
+      if (savedRoomId && savedPlayerName) {
+        console.log(`Auto-rejoining room: ${savedRoomId} as ${savedPlayerName} with ID: ${pid}`);
+        newSocket.emit('join_room', { roomId: savedRoomId, playerName: savedPlayerName, playerId: pid });
+      }
     });
 
     newSocket.on('room_state_update', (newState) => {
@@ -35,6 +51,9 @@ export const SocketProvider = ({ children }) => {
 
     newSocket.on('error_message', (err) => {
       setError(err);
+      if (err === 'Room not found' || err === 'Game already in progress') {
+        sessionStorage.removeItem('deception_room_id');
+      }
       // Clear error after 4 seconds
       setTimeout(() => setError(null), 4000);
     });
@@ -46,16 +65,22 @@ export const SocketProvider = ({ children }) => {
 
   const createRoom = (playerName) => {
     if (!socket) return;
-    // Generate a random 4 letter code
     const code = Math.random().toString(36).substring(2, 6).toUpperCase();
     setChatMessages([]);
-    socket.emit('join_room', { roomId: code, playerName });
+    const pid = sessionStorage.getItem('deception_player_id') || playerId;
+    sessionStorage.setItem('deception_room_id', code);
+    sessionStorage.setItem('deception_player_name', playerName);
+    socket.emit('join_room', { roomId: code, playerName, playerId: pid });
   };
 
   const joinRoom = (roomId, playerName) => {
     if (!socket) return;
     setChatMessages([]);
-    socket.emit('join_room', { roomId: roomId.toUpperCase(), playerName });
+    const code = roomId.toUpperCase();
+    const pid = sessionStorage.getItem('deception_player_id') || playerId;
+    sessionStorage.setItem('deception_room_id', code);
+    sessionStorage.setItem('deception_player_name', playerName);
+    socket.emit('join_room', { roomId: code, playerName, playerId: pid });
   };
 
   const addMockPlayers = () => {
@@ -68,6 +93,7 @@ export const SocketProvider = ({ children }) => {
     socket.emit('leave_room', { roomId: gameState.roomId });
     setGameState(null);
     setChatMessages([]);
+    sessionStorage.removeItem('deception_room_id');
   };
 
 
@@ -143,6 +169,7 @@ export const SocketProvider = ({ children }) => {
         gameState,
         chatMessages,
         error,
+        playerId,
         createRoom,
         joinRoom,
         addMockPlayers,
@@ -160,7 +187,6 @@ export const SocketProvider = ({ children }) => {
         nextRound,
         resetToLobby,
         sendMessage
-
       }}
     >
       {children}

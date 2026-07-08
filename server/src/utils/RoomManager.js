@@ -24,7 +24,7 @@ export class RoomManager {
     return this.rooms.get(roomId);
   }
 
-  createRoom(roomId, hostId, hostName) {
+  createRoom(roomId, hostId, hostName, socketId) {
     const room = {
       roomId,
       status: 'lobby',
@@ -32,6 +32,7 @@ export class RoomManager {
       players: {
         [hostId]: {
           id: hostId,
+          socketId: socketId,
           name: hostName,
           role: null,
           isHost: true,
@@ -56,9 +57,16 @@ export class RoomManager {
     return room;
   }
 
-  joinRoom(roomId, playerId, playerName) {
+  joinRoom(roomId, playerId, playerName, socketId) {
     const room = this.rooms.get(roomId);
     if (!room) return null;
+
+    // Allow rejoining an in-progress game
+    if (room.players[playerId]) {
+      room.players[playerId].socketId = socketId;
+      this.logAction(roomId, `${playerName} reconnected`);
+      return room;
+    }
 
     if (room.status !== 'lobby') {
       return { error: 'Game already in progress' };
@@ -66,6 +74,7 @@ export class RoomManager {
 
     room.players[playerId] = {
       id: playerId,
+      socketId: socketId,
       name: playerName,
       role: null,
       isHost: false,
@@ -80,13 +89,23 @@ export class RoomManager {
     return room;
   }
 
-  leaveRoom(roomId, playerId) {
+  leaveRoom(roomId, socketId) {
     const room = this.rooms.get(roomId);
     if (!room) return null;
 
-    const playerName = room.players[playerId]?.name || 'A player';
-    delete room.players[playerId];
-    this.logAction(roomId, `${playerName} left the room`);
+    const playerId = Object.keys(room.players).find(pId => room.players[pId].socketId === socketId);
+    if (!playerId) return room;
+
+    const player = room.players[playerId];
+    const playerName = player.name;
+
+    if (room.status === 'lobby') {
+      delete room.players[playerId];
+      this.logAction(roomId, `${playerName} left the room`);
+    } else {
+      player.socketId = null;
+      this.logAction(roomId, `${playerName} disconnected`);
+    }
 
     // If room is empty, delete it
     if (Object.keys(room.players).length === 0) {
@@ -94,7 +113,41 @@ export class RoomManager {
       return null;
     }
 
-    // If host left, assign new host
+    // If host left/disconnected, assign new host
+    if (player.isHost) {
+      player.isHost = false;
+      const connectedHuman = Object.values(room.players).find(p => p.socketId && !p.id.startsWith('mock_bot_'));
+      if (connectedHuman) {
+        connectedHuman.isHost = true;
+        this.logAction(roomId, `${connectedHuman.name} is now the Host`);
+      } else {
+        const firstPlayer = Object.values(room.players)[0];
+        if (firstPlayer) {
+          firstPlayer.isHost = true;
+          this.logAction(roomId, `${firstPlayer.name} is now the Host`);
+        }
+      }
+    }
+
+    return room;
+  }
+
+  forceLeaveRoom(roomId, socketId) {
+    const room = this.rooms.get(roomId);
+    if (!room) return null;
+
+    const playerId = Object.keys(room.players).find(pId => room.players[pId].socketId === socketId);
+    if (!playerId) return room;
+
+    const playerName = room.players[playerId].name;
+    delete room.players[playerId];
+    this.logAction(roomId, `${playerName} left the room`);
+
+    if (Object.keys(room.players).length === 0) {
+      this.rooms.delete(roomId);
+      return null;
+    }
+
     if (room.players && !Object.values(room.players).some(p => p.isHost)) {
       const firstPlayerId = Object.keys(room.players)[0];
       if (firstPlayerId) {
@@ -126,9 +179,10 @@ export class RoomManager {
   toggleDevMode(roomId, playerId, isDevMode) {
     const room = this.rooms.get(roomId);
     if (!room) return null;
-    if (room.players[playerId]) {
-      room.players[playerId].isDevMode = isDevMode;
-      this.logAction(roomId, `${room.players[playerId].name} toggled Dev Mode ${isDevMode ? 'ON' : 'OFF'}`);
+    const player = room.players[playerId] || Object.values(room.players).find(p => p.socketId === playerId);
+    if (player) {
+      player.isDevMode = isDevMode;
+      this.logAction(roomId, `${player.name} toggled Dev Mode ${isDevMode ? 'ON' : 'OFF'}`);
     }
     return room;
   }
@@ -292,7 +346,7 @@ export class RoomManager {
     const room = this.rooms.get(roomId);
     if (!room) return null;
 
-    const player = room.players[playerId];
+    const player = room.players[playerId] || Object.values(room.players).find(p => p.socketId === playerId);
     if (!player || player.role !== 'murderer') {
       return { error: 'Only the Murderer can choose the crime evidence' };
     }
@@ -386,7 +440,7 @@ export class RoomManager {
     const room = this.rooms.get(roomId);
     if (!room) return null;
 
-    const accuser = room.players[accuserId];
+    const accuser = room.players[accuserId] || Object.values(room.players).find(p => p.socketId === accuserId);
     if (!accuser || !accuser.isAlive || accuser.hasAccused) {
       return { error: 'You cannot make an accusation' };
     }

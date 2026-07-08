@@ -88,10 +88,10 @@ export const ENVIRONMENT_TILES = [
   },
   {
     id: 't_env3',
-    title: 'Weather conditions',
-    titleAr: 'حالة الطقس',
-    options: ['Sunny/Hot', 'Rainy/Stormy', 'Cold/Snowy', 'Foggy/Misty', 'Windy', 'Humid'],
-    optionsAr: ['مشمس / حار', 'ممطر / عاصف', 'بارد / مثلج', 'ضبابي / غائم', 'رياح قوية', 'رطوبة عالية'],
+    title: 'Motive of Crime',
+    titleAr: 'دافع الجريمة',
+    options: ['Hatred/Revenge', 'Money/Greed', 'Jealousy/Love', 'Self-defense', 'Silence/Cover-up', 'Accident'],
+    optionsAr: ['الكراهية / الانتقام', 'المال / الطمع', 'الغيرة / الشغف', 'الدفاع عن النفس', 'إسكات الضحية / التغطية', 'حادث قضاء وقدر'],
     selectedOptionIndex: null
   },
   {
