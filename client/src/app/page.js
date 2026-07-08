@@ -266,6 +266,237 @@ const ROLE_LABELS = {
 const roleLabel = (role, type = 'ar') => ROLE_LABELS[role]?.[type] ?? '—';
 const roleCls   = (role) => ROLE_LABELS[role]?.cls ?? '';
 
+/* ─── Web Audio Sound Engine (Synth SFX) ─── */
+class SoundEngine {
+  constructor() {
+    this.ctx = null;
+    this.enabled = true;
+  }
+  init() {
+    if (!this.ctx && typeof window !== 'undefined') {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) this.ctx = new AudioCtx();
+    }
+  }
+  play(type) {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+    const dest = this.ctx.destination;
+    const now = this.ctx.currentTime;
+    switch (type) {
+      case 'click': {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.frequency.setValueAtTime(550, now);
+        osc.frequency.exponentialRampToValueAtTime(120, now + 0.08);
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.start(now);
+        osc.stop(now + 0.08);
+        break;
+      }
+      case 'confirm': {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.setValueAtTime(450, now + 0.08);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.start(now);
+        osc.stop(now + 0.22);
+        break;
+      }
+      case 'warning': {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.setValueAtTime(150, now + 0.12);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.start(now);
+        osc.stop(now + 0.22);
+        break;
+      }
+      case 'night': {
+        // Heartbeat
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.frequency.setValueAtTime(55, now);
+        osc.frequency.exponentialRampToValueAtTime(10, now + 0.15);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.start(now);
+        osc.stop(now + 0.15);
+        break;
+      }
+      case 'radar': {
+        // Radar beep
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.frequency.setValueAtTime(880, now);
+        gain.gain.setValueAtTime(0.03, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc.start(now);
+        osc.stop(now + 0.35);
+        break;
+      }
+      case 'win': {
+        const notes = [261.63, 329.63, 392.00, 523.25];
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.connect(gain);
+          gain.connect(dest);
+          osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+          gain.gain.setValueAtTime(0.05, now + idx * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.45);
+          osc.start(now + idx * 0.08);
+          osc.stop(now + idx * 0.08 + 0.5);
+        });
+        break;
+      }
+      case 'lose': {
+        const notes = [98, 99];
+        notes.forEach((freq) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.connect(gain);
+          gain.connect(dest);
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.05, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+          osc.start(now);
+          osc.stop(now + 0.9);
+        });
+        break;
+      }
+    }
+  }
+}
+const sfx = new SoundEngine();
+
+/* ─── Dynamic Connecting Threads (Accusation Map) ─── */
+function ConnectingThreads({ gameState, lang, canSeeSecret }) {
+  const [lines, setLines] = useState([]);
+  const containerRef = useRef(null);
+
+  const updateLines = useCallback(() => {
+    if (!containerRef.current || !gameState) return;
+    const newLines = [];
+    const containerRect = containerRef.current.getBoundingClientRect();
+
+    // 1. Draw secret crime key threads if player is privileged
+    if (canSeeSecret) {
+      const murderer = Object.values(gameState.players).find(p => p.role === 'murderer');
+      if (murderer && gameState.crimeEvidence) {
+        const suspectId = `suspect-card-${murderer.id}`;
+        const clueId = `clue-card-${gameState.crimeEvidence.clueCardId}`;
+        const meansId = `means-card-${gameState.crimeEvidence.meansCardId}`;
+
+        const suspectEl = document.getElementById(suspectId);
+        const clueEl = document.getElementById(clueId);
+        const meansEl = document.getElementById(meansId);
+
+        if (suspectEl && clueEl && meansEl) {
+          const sRect = suspectEl.getBoundingClientRect();
+          const cRect = clueEl.getBoundingClientRect();
+          const mRect = meansEl.getBoundingClientRect();
+
+          const sX = sRect.left + sRect.width / 2 - containerRect.left;
+          const sY = sRect.top + sRect.height / 2 - containerRect.top;
+          
+          const cX = cRect.left + cRect.width / 2 - containerRect.left;
+          const cY = cRect.top + cRect.height / 2 - containerRect.top;
+
+          const mX = mRect.left + mRect.width / 2 - containerRect.left;
+          const mY = mRect.top + mRect.height / 2 - containerRect.top;
+
+          newLines.push({ x1: sX, y1: sY, x2: cX, y2: cY, type: 'secret-clue' });
+          newLines.push({ x1: sX, y1: sY, x2: mX, y2: mY, type: 'secret-means' });
+        }
+      }
+    }
+
+    // 2. Connect the victim file (location / cause of death)
+    const bodyEl = document.getElementById('victim-body-avatar');
+    const locTileEl = document.getElementById('scene-tile-t_loc');
+    const causeTileEl = document.getElementById('scene-tile-t_cause');
+
+    if (bodyEl && locTileEl && causeTileEl) {
+      const bRect = bodyEl.getBoundingClientRect();
+      const lRect = locTileEl.getBoundingClientRect();
+      const cRect = causeTileEl.getBoundingClientRect();
+
+      const bX = bRect.left + bRect.width / 2 - containerRect.left;
+      const bY = bRect.top + bRect.height / 2 - containerRect.top;
+
+      const lX = lRect.left + lRect.width / 2 - containerRect.left;
+      const lY = lRect.top + lRect.height / 2 - containerRect.top;
+
+      const cX = cRect.left + cRect.width / 2 - containerRect.left;
+      const cY = cRect.top + cRect.height / 2 - containerRect.top;
+
+      newLines.push({ x1: bX, y1: bY, x2: lX, y2: lY, type: 'victim-connection' });
+      newLines.push({ x1: bX, y1: bY, x2: cX, y2: cY, type: 'victim-connection' });
+    }
+
+    setLines(newLines);
+  }, [gameState, canSeeSecret]);
+
+  useEffect(() => {
+    updateLines();
+    window.addEventListener('resize', updateLines);
+    // Poll a few times for loaded image/render delay
+    const interval = setInterval(updateLines, 1000);
+    return () => {
+      window.removeEventListener('resize', updateLines);
+      clearInterval(interval);
+    };
+  }, [gameState, updateLines]);
+
+  return (
+    <div ref={containerRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1 }}>
+      <svg style={{ width: '100%', height: '100%' }}>
+        {lines.map((line, idx) => (
+          <line
+            key={idx}
+            x1={line.x1}
+            y1={line.y1}
+            x2={line.x2}
+            y2={line.y2}
+            className={line.type === 'victim-connection' ? 'victim-thread' : 'secret-thread'}
+            style={{
+              stroke: line.type === 'victim-connection' ? 'rgba(255, 215, 0, 0.45)' : 'rgba(255, 56, 56, 0.7)',
+              strokeWidth: 2,
+              strokeDasharray: line.type === 'victim-connection' ? '4 4' : '6 4',
+            }}
+          />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════
    Codenames Style Suspect Avatar
    ═══════════════════════════════════════════════ */
@@ -407,6 +638,11 @@ function GameApp() {
     startForensicPhase,
   } = useGame();
 
+  /* ── Derived ── */
+  const myId   = playerId || socket?.id;
+  const me     = gameState?.players?.[myId];
+  const isHost = me?.isHost;
+
   /* ── UI State ── */
   const [mounted,       setMounted]       = useState(false);
   const [sidebarOpen,   setSidebarOpen]   = useState(false);
@@ -426,11 +662,74 @@ function GameApp() {
   const [accuseClue,    setAccuseClue]    = useState(null);
   const [accuseMeans,   setAccuseMeans]   = useState(null);
   const [localForensicOption, setLocalForensicOption] = useState(null);
+  const [soundEnabled,      setSoundEnabled]      = useState(true);
+  const [flashlightEnabled, setFlashlightEnabled] = useState(false);
 
   const chatEndRef = useRef(null);
 
   /* ── Effects ── */
   useEffect(() => { setMounted(true); }, []);
+
+  // Sync sound setting
+  useEffect(() => {
+    sfx.enabled = soundEnabled;
+  }, [soundEnabled]);
+
+  // Flashlight shadow spotlight movement listener
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      const x = `${(e.clientX / window.innerWidth) * 100}%`;
+      const y = `${(e.clientY / window.innerHeight) * 100}%`;
+      document.documentElement.style.setProperty('--mouse-x', x);
+      document.documentElement.style.setProperty('--mouse-y', y);
+    };
+    if (flashlightEnabled) {
+      document.documentElement.classList.add('flashlight-active');
+      window.addEventListener('mousemove', handleMouseMove);
+    } else {
+      document.documentElement.classList.remove('flashlight-active');
+      window.removeEventListener('mousemove', handleMouseMove);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, [flashlightEnabled]);
+
+  // Game Status sounds
+  useEffect(() => {
+    if (!gameState) return;
+    
+    if (gameState.status === 'night_selection') {
+      sfx.play('warning');
+      const interval = setInterval(() => {
+        sfx.play('night');
+      }, 1200);
+      return () => clearInterval(interval);
+    }
+    
+    if (gameState.status === 'forensic_selection') {
+      sfx.play('confirm');
+    }
+    
+    if (gameState.status === 'investigation') {
+      sfx.play('confirm');
+      const interval = setInterval(() => {
+        sfx.play('radar');
+      }, 8000);
+      return () => clearInterval(interval);
+    }
+
+    if (gameState.status === 'game_over') {
+      const isInvWin = gameState.winner === 'investigators';
+      const amIMurderer = me?.role === 'murderer';
+      const won = (isInvWin && !amIMurderer) || (!isInvWin && amIMurderer);
+      if (won) {
+        sfx.play('win');
+      } else {
+        sfx.play('lose');
+      }
+    }
+  }, [gameState?.status, me?.role]);
 
   useEffect(() => {
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -467,17 +766,17 @@ function GameApp() {
 
   if (!mounted) return null;
 
-  /* ── Derived ── */
-  const myId   = playerId || socket?.id;
-  const me     = gameState?.players?.[myId];
-  const isHost = me?.isHost;
-
   /* ─── Background ─── */
   const Bg = () => (
     <div className="background-wrapper">
       <div className="stars-layer" />
       <div className="glow-blob blob-red" />
       <div className="glow-blob blob-blue" />
+      <div className="mist-container">
+        <div className="mist-cloud" />
+        <div className="mist-cloud" />
+      </div>
+      <div className="flashlight-overlay" />
       <div className="crt-overlay" />
       <div className="hud-corner-info top-left">SYS_STATUS: ACTIVE</div>
       <div className="hud-corner-info top-right">LOC: HONG KONG HQ</div>
@@ -492,11 +791,30 @@ function GameApp() {
 
   /* ─── Floating lang selector ─── */
   const LangToggle = () => (
-    <div className="header-actions" style={{ position: 'fixed', top: 16, left: 16, display: 'flex', gap: 10, zIndex: 200 }}>
+    <div className="header-actions" style={{ position: 'fixed', top: 16, left: 16, display: 'flex', gap: 8, zIndex: 200 }}>
       <div className="lang-selector">
-        <button className={`lang-btn ${lang === 'ar' ? 'active' : ''}`} onClick={() => handleLang('ar')}>العربية</button>
-        <button className={`lang-btn ${lang === 'en' ? 'active' : ''}`} onClick={() => handleLang('en')}>English</button>
+        <button className={`lang-btn ${lang === 'ar' ? 'active' : ''}`} onClick={() => { sfx.play('click'); handleLang('ar'); }}>العربية</button>
+        <button className={`lang-btn ${lang === 'en' ? 'active' : ''}`} onClick={() => { sfx.play('click'); handleLang('en'); }}>English</button>
       </div>
+      <button 
+        className="sound-toggle-btn"
+        onClick={() => {
+          setSoundEnabled(v => !v);
+          sfx.play('click');
+        }}
+      >
+        {soundEnabled ? '🔊' : '🔇'} {lang === 'ar' ? 'الصوت' : 'Sound'}
+      </button>
+      <button
+        className="sound-toggle-btn"
+        style={{ borderColor: flashlightEnabled ? 'var(--color-gold)' : 'var(--border-glass)' }}
+        onClick={() => {
+          setFlashlightEnabled(v => !v);
+          sfx.play('click');
+        }}
+      >
+        🔦 {lang === 'ar' ? 'كشاف' : 'Light'}
+      </button>
     </div>
   );
 
@@ -527,7 +845,7 @@ function GameApp() {
         {/* ─ Home View ─ */}
         {entryView === 'home' && (
           <div className="action-cards-list">
-            <div className="action-card" onClick={() => setEntryView('create')}>
+            <div className="action-card" onClick={() => { sfx.play('click'); setEntryView('create'); }}>
               <span className="action-card-arrow">←</span>
               <div className="action-card-left">
                 <div className="action-card-icon create">👑</div>
@@ -538,7 +856,7 @@ function GameApp() {
               </div>
             </div>
 
-            <div className="action-card" onClick={() => setEntryView('join')}>
+            <div className="action-card" onClick={() => { sfx.play('click'); setEntryView('join'); }}>
               <span className="action-card-arrow">←</span>
               <div className="action-card-left">
                 <div className="action-card-icon join">👥</div>
@@ -557,7 +875,7 @@ function GameApp() {
             <div className="dossier-tab">{lang === 'ar' ? 'إنشاء قضية' : 'CREATE CASE'}</div>
             <div className="dossier-clip" />
             <div className="inner-entry-header">
-              <button className="inner-back-btn" onClick={() => setEntryView('home')}>←</button>
+              <button className="inner-back-btn" onClick={() => { sfx.play('click'); setEntryView('home'); }}>←</button>
               <span style={{ fontWeight: 700, fontSize: '1rem' }}>{txt('createRoom')}</span>
             </div>
             <div className="form-group">
@@ -587,7 +905,7 @@ function GameApp() {
             <div className="dossier-tab">{lang === 'ar' ? 'ملف التحقيق' : 'INVESTIGATION'}</div>
             <div className="dossier-clip" />
             <div className="inner-entry-header">
-              <button className="inner-back-btn" onClick={() => setEntryView('home')}>←</button>
+              <button className="inner-back-btn" onClick={() => { sfx.play('click'); setEntryView('home'); }}>←</button>
               <span style={{ fontWeight: 700, fontSize: '1rem' }}>{txt('joinRoom')}</span>
             </div>
             <div className="form-group">
@@ -1247,7 +1565,7 @@ function GameApp() {
     if (isCause)    headerClass = 'cause';
 
     return (
-      <div key={tile.id} className="scene-tile" style={{ background: 'rgba(5, 8, 16, 0.5)' }}>
+      <div key={tile.id} id={`scene-tile-${tile.id}`} className="scene-tile" style={{ background: 'rgba(5, 8, 16, 0.5)' }}>
         <div className={`scene-tile-header ${headerClass}`}>
           <span>{lang === 'ar' ? tile.titleAr : tile.title}</span>
           {isForensic && !isLocation && !isCause && gameState.tileReplacementsLeft > 0 && (
@@ -1326,14 +1644,8 @@ function GameApp() {
       <div className="board-layout" style={{ gridTemplateColumns: '1fr' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20, width: '100%' }}>
           
-          <div className="corkboard-section">
-            {/* SVG Connecting Thread */}
-            <svg className="evidence-web-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-              <line x1="83" y1="20" x2="50" y2="20" />
-              <line x1="50" y1="20" x2="16" y2="20" />
-              <line x1="50" y1="35" x2="35" y2="85" />
-              <line x1="50" y1="35" x2="65" y2="85" />
-            </svg>
+          <div className="corkboard-section" style={{ position: 'relative' }}>
+            <ConnectingThreads gameState={gameState} lang={lang} canSeeSecret={canSeeSecret} />
 
             {/* Top Three Themed Columns */}
             <div className="evidence-board-columns">
@@ -1345,7 +1657,7 @@ function GameApp() {
                   {Object.values(gameState.players)
                     .filter(p => p.role !== 'forensic')
                     .map(player => (
-                      <div key={player.id} className={`corkboard-card player-board-card ${!player.isAlive ? 'dead-spectator' : ''}`} style={{ minHeight: 180 }}>
+                      <div key={player.id} id={`suspect-card-${player.id}`} className={`corkboard-card player-board-card ${!player.isAlive ? 'dead-spectator' : ''}`} style={{ minHeight: 180 }}>
                         <div className="pin blue-pin" />
                         <div className="tape" />
                         
@@ -1385,7 +1697,7 @@ function GameApp() {
                             {player.clueCards.map(card => {
                               const isRevealed = canSeeSecret && player.role === 'murderer' && card.id === gameState.crimeEvidence?.clueCardId;
                               return (
-                                <div key={card.id} className={`game-card clue ${isRevealed ? 'selected' : ''}`} style={{ padding: '4px 2px', minHeight: 46 }}>
+                                <div key={card.id} id={`clue-card-${card.id}`} className={`game-card clue ${isRevealed ? 'selected' : ''}`} style={{ padding: '4px 2px', minHeight: 46 }} onClick={() => sfx.play('click')}>
                                   <div className="card-emoji-wrapper" style={{ width: 22, height: 22, fontSize: '0.85rem', marginBottom: 1 }}>{card.emoji}</div>
                                   <span style={{ fontWeight: 700, fontSize: '0.62rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
                                     {lang === 'ar' ? card.nameAr : card.name}
@@ -1398,7 +1710,7 @@ function GameApp() {
                             {player.meansCards.map(card => {
                               const isRevealed = canSeeSecret && player.role === 'murderer' && card.id === gameState.crimeEvidence?.meansCardId;
                               return (
-                                <div key={card.id} className={`game-card means ${isRevealed ? 'selected' : ''}`} style={{ padding: '4px 2px', minHeight: 46 }}>
+                                <div key={card.id} id={`means-card-${card.id}`} className={`game-card means ${isRevealed ? 'selected' : ''}`} style={{ padding: '4px 2px', minHeight: 46 }} onClick={() => sfx.play('click')}>
                                   <div className="card-emoji-wrapper" style={{ width: 22, height: 22, fontSize: '0.85rem', marginBottom: 1 }}>{card.emoji}</div>
                                   <span style={{ fontWeight: 700, fontSize: '0.62rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
                                     {lang === 'ar' ? card.nameAr : card.name}
@@ -1420,7 +1732,7 @@ function GameApp() {
                   <div className="pin red-pin" />
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '14px 0', borderBottom: '1px dashed rgba(255,255,255,0.05)', position: 'relative' }}>
                     <div className="tape" />
-                    <div style={{ width: 72, height: 92, border: '2px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.4)', borderRadius: 6, display: 'flex', alignItems: 'center', justifycontent: 'center', marginBottom: 8 }}>
+                    <div id="victim-body-avatar" style={{ width: 72, height: 92, border: '2px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.4)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
                       <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 44, height: 44, opacity: 0.15 }}>
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
                       </svg>

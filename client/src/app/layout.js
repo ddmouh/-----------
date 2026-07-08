@@ -1,4 +1,4 @@
-import { Cinzel, Outfit } from "next/font/google";
+import { Cinzel, Outfit, Cairo } from "next/font/google";
 import "./globals.css";
 
 const cinzel = Cinzel({
@@ -13,6 +13,12 @@ const outfit = Outfit({
   weight: ["300", "400", "500", "700"],
 });
 
+const cairo = Cairo({
+  variable: "--font-cairo",
+  subsets: ["arabic", "latin"],
+  weight: ["300", "400", "600", "700", "900"],
+});
+
 export const metadata = {
   title: "لعبة القضية | Deception: Murder in Hong Kong",
   description: "لعبة تحقيق وغموض جماعية على الإنترنت - Real-time multiplayer mystery deduction game",
@@ -20,7 +26,8 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="ar" dir="rtl" className={`${cinzel.variable} ${outfit.variable}`} suppressHydrationWarning>
+    <html lang="ar" dir="rtl" className={`${cinzel.variable} ${outfit.variable} ${cairo.variable}`} suppressHydrationWarning>
+
       <head>
         <script
           dangerouslySetInnerHTML={{
