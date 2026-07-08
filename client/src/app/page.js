@@ -478,6 +478,15 @@ function GameApp() {
       <div className="stars-layer" />
       <div className="glow-blob blob-red" />
       <div className="glow-blob blob-blue" />
+      <div className="crt-overlay" />
+      <div className="hud-corner-info top-left">SYS_STATUS: ACTIVE</div>
+      <div className="hud-corner-info top-right">LOC: HONG KONG HQ</div>
+      <div className="hud-corner-info bottom-left">SURVEILLANCE CAM #04</div>
+      <div className="hud-corner-info bottom-right">CASE ID: {gameState?.roomId || "OFFLINE"}</div>
+      <div className={`classified-stamp ${lang === 'ar' ? 'ar' : ''}`}>
+        <span>{lang === 'ar' ? 'سري للغاية' : 'CLASSIFIED'}</span>
+        <span style={{ fontSize: '0.5rem', marginTop: 4 }}>{lang === 'ar' ? 'لعبة القضية' : 'CONFIDENTIAL'}</span>
+      </div>
     </div>
   );
 
@@ -503,7 +512,7 @@ function GameApp() {
         <button className="hamburger-btn" onClick={() => setSidebarOpen(true)}>☰</button>
 
         <div className="lobby-logo">⚖️</div>
-        <h1 className="lobby-main-title">{txt('gameTitle')}</h1>
+        <h1 className="lobby-main-title glitch-text" data-text={txt('gameTitle')}>{txt('gameTitle')}</h1>
         <p className="lobby-sub-title">{txt('subTitle')}</p>
 
         <div className="pill-bar">
@@ -544,7 +553,9 @@ function GameApp() {
 
         {/* ─ Create Room View ─ */}
         {entryView === 'create' && (
-          <div className="glass-card glass-card-heavy action-cards-list" style={{ padding: 24, gap: 16, display: 'flex', flexDirection: 'column' }}>
+          <div className="glass-card glass-card-heavy action-cards-list dossier-folder" style={{ padding: 24, gap: 16, display: 'flex', flexDirection: 'column' }}>
+            <div className="dossier-tab">{lang === 'ar' ? 'إنشاء قضية' : 'CREATE CASE'}</div>
+            <div className="dossier-clip" />
             <div className="inner-entry-header">
               <button className="inner-back-btn" onClick={() => setEntryView('home')}>←</button>
               <span style={{ fontWeight: 700, fontSize: '1rem' }}>{txt('createRoom')}</span>
@@ -572,7 +583,9 @@ function GameApp() {
 
         {/* ─ Join Room View ─ */}
         {entryView === 'join' && (
-          <div className="glass-card glass-card-heavy action-cards-list" style={{ padding: 24, gap: 16, display: 'flex', flexDirection: 'column' }}>
+          <div className="glass-card glass-card-heavy action-cards-list dossier-folder" style={{ padding: 24, gap: 16, display: 'flex', flexDirection: 'column' }}>
+            <div className="dossier-tab">{lang === 'ar' ? 'ملف التحقيق' : 'INVESTIGATION'}</div>
+            <div className="dossier-clip" />
             <div className="inner-entry-header">
               <button className="inner-back-btn" onClick={() => setEntryView('home')}>←</button>
               <span style={{ fontWeight: 700, fontSize: '1rem' }}>{txt('joinRoom')}</span>
@@ -965,9 +978,15 @@ function GameApp() {
           {/* Investigator wait screen */}
           {!canSeeCrime && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', marginBottom: 14 }}>{txt('preparingCrimeScene')}</div>
-              <div style={{ width: 220, height: 4, backgroundColor: 'rgba(255,255,255,.06)', borderRadius: 4, overflow: 'hidden', margin: '0 auto' }}>
-                <div style={{ width: '60%', height: '100%', background: 'var(--color-crimson)', animation: 'pulse 1.5s infinite' }} />
+              <div style={{ fontSize: '0.9rem', color: 'var(--color-crimson)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>{txt('preparingCrimeScene')}</div>
+              <div className="sonar-radar-container">
+                <div className="sonar-grid" />
+                <div className="sonar-sweep" />
+                <div className="sonar-blip a" />
+                <div className="sonar-blip b" />
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: 'monospace', opacity: 0.7, marginTop: 10 }}>
+                SCANNING SECTOR 09... TRACKING SUSPECTS
               </div>
             </div>
           )}
